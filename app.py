@@ -98,7 +98,7 @@ subjects = ["বাংলা", "English", "Math", "General Knowledge"]
 st.markdown("""
     <div class="main-header">
         <h1>পেট্রোবাংলা জব প্রিপারেশন</h1>
-        <p style="margin: 0; font-size: 16px;">স্মার্ট এআই ভিত্তিক মডেল টেস্ট ও প্রশ্ন প্রস্তুতি প্ল্যাটফর্ম</p>
+        <p style="margin: 0; font-size: 16px;">মডেল টেস্ট ও প্রশ্ন প্রস্তুতি প্ল্যাটফর্ম</p>
     </div>
 """, unsafe_allow_html=True)
 
