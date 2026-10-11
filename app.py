@@ -10,6 +10,30 @@ import io
 
 st.set_page_config(page_title="Petrobangla Exam Prep", layout="wide")
 
+# Custom CSS for modern styling and professional colors
+st.markdown("""
+    <style>
+    .main {
+        background-color: #f8f9fa;
+    }
+    .stButton>button {
+        background-color: #0d6efd;
+        color: white;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        font-weight: 600;
+        border: none;
+    }
+    .stButton>button:hover {
+        background-color: #0b5ed7;
+        color: white;
+    }
+    .css-1d391kg {
+        background-color: #f1f3f5;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # Persistent storage file names
 DB_FILE = "question_bank.json"
 CONFIG_FILE = "config.json"
@@ -47,7 +71,8 @@ def save_api_key(key):
 
 subjects = ["বাংলা", "English", "Math", "General Knowledge"]
 
-st.title("পেট্রোবাংলা জব প্রিপারেশন")
+st.markdown("<h1 style='text-align: center; color: #1e3d59;'>🔥 পেট্রোবাংলা জব প্রিপারেশন ও এআই কোশ্চেন ব্যাংক</h1>", unsafe_allow_html=True)
+st.markdown("---")
 
 st.sidebar.header("⚙️ এআই সেটআপ")
 
@@ -57,7 +82,8 @@ if api_key_input and api_key_input != st.session_state.api_key:
     save_api_key(api_key_input)
     st.sidebar.success("এপিআই কি সফলভাবে সেভ হয়েছে!")
 
-menu = st.sidebar.radio("মেনু সিলেক্ট করুন", ["পিডিএফ আপলোড ও প্রশ্ন তৈরি", "প্রশ্ন ব্যাংক", "পরীক্ষা দিন"])
+# ডিফল্টভাবে প্রথম মেনু "পরীক্ষা দিন" রাখা হয়েছে
+menu = st.sidebar.radio("মেনু সিলেক্ট করুন", ["পরীক্ষা দিন", "পিডিএফ আপলোড ও প্রশ্ন তৈরি", "প্রশ্ন ব্যাংক"])
 
 def generate_questions_from_pdf_images(pdf_file, subject, topic, api_key, existing_questions):
     try:
@@ -114,90 +140,16 @@ def generate_questions_from_pdf_images(pdf_file, subject, topic, api_key, existi
     except Exception as e:
         return None, str(e)
 
-# ----------------- ১. পিডিএফ আপলোড ও প্রশ্ন তৈরি -----------------
-if menu == "পিডিএফ আপলোড ও প্রশ্ন তৈরি":
-    st.markdown("## 📄 বই বা স্ক্যান করা পিডিএফ আপলোড করুন")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        selected_subject = st.selectbox("সাবজেক্ট বেছে নিন", subjects)
-    with col2:
-        topic_name = st.text_input("টপিকের নাম লিখুন (যেমন: শব্দার্থ, Vocabulary)")
-        
-    uploaded_file = st.file_uploader("পিডিএফ (PDF) ফাইল আপলোড করুন", type=["pdf"])
-    
-    if uploaded_file and topic_name:
-        st.success(f"ফাইল লোড হয়েছে: {uploaded_file.name}")
-        
-        if st.button("🤖 Gemini AI দিয়ে সর্বোচ্চ ৫০টি পর্যন্ত নতুন প্রশ্ন তৈরি করুন"):
-            if not st.session_state.api_key:
-                st.error("⚠️ বামপাশের সাইডবারে আপনার Gemini API Key প্রদান করুন!")
-            else:
-                with st.spinner("Gemini 3.8 Flash বইয়ের পৃষ্ঠা স্ক্যান করে নতুন ও ইউনিক প্রশ্ন তৈরি করছে... একটু সময় লাগতে পারে..."):
-                    qs, err = generate_questions_from_pdf_images(uploaded_file, selected_subject, topic_name, st.session_state.api_key, st.session_state.question_bank)
-                    if err:
-                        st.error(f"প্রশ্ন জেনারেট করতে ত্রুটি ঘটেছে: {err}")
-                    else:
-                        existing_questions_set = {q["question"].strip() for q in st.session_state.question_bank}
-                        new_added = 0
-                        for q in qs:
-                            if q["question"].strip() not in existing_questions_set:
-                                st.session_state.question_bank.append(q)
-                                existing_questions_set.add(q["question"].strip())
-                                new_added += 1
-                        
-                        save_question_bank()
-                        st.success(f"🎉 সফলভাবে Gemini AI থেকে নতুন {new_added} টি প্রশ্ন ব্যাংক-এ জমা হয়েছে এবং সেভ করা হয়েছে!")
-
-# ----------------- ২. প্রশ্ন ব্যাংক -----------------
-elif menu == "প্রশ্ন ব্যাংক":
-    st.markdown("## 📚 প্রশ্ন ব্যাংক (Question Bank)")
-    
-    available_topics = list(set([q.get("topic", "অন্যান্য") for q in st.session_state.question_bank]))
-    
-    col_f1, col_f2, col_f3 = st.columns([2, 2, 1])
-    with col_f1:
-        sub_filter = st.selectbox("সাবজেক্ট ফিল্টার", ["সব"] + subjects)
-    with col_f2:
-        topic_filter = st.selectbox("টপিক ফিল্টার", ["সব"] + available_topics)
-    with col_f3:
-        if st.button("🗑️ সব মুছুন", type="primary"):
-            st.session_state.question_bank = []
-            save_question_bank()
-            st.rerun()
-            
-    filtered_qs = [
-        (idx, q) for idx, q in enumerate(st.session_state.question_bank)
-        if (sub_filter == "সব" or q["subject"] == sub_filter) and (topic_filter == "সব" or q.get("topic") == topic_filter)
-    ]
-    
-    st.write(f"মোট প্রশ্ন আছে: **{len(filtered_qs)}** টি")
-    
-    for idx, q in filtered_qs:
-        with st.expander(f"প্রশ্ন {idx+1}: [{q['subject']} - {q.get('topic', 'জেনারেল')}] {q['question']}"):
-            c1, c2 = st.columns([4, 1])
-            with c1:
-                for opt in q['options']:
-                    st.write(f"- {opt}")
-                st.write(f"**সঠিক উত্তর:** {q['answer']}")
-                st.caption(f"💡 ব্যাখ্যা: {q.get('explanation', 'কোন ব্যাখ্যা নেই')}")
-            with c2:
-                if st.button("🗑️ মুছুন", key=f"del_{idx}"):
-                    st.session_state.question_bank.pop(idx)
-                    save_question_bank()
-                    st.success("প্রশ্নটি মুছে ফেলা হয়েছে!")
-                    st.rerun()
-
-# ----------------- ৩. পরীক্ষা দিন -----------------
-elif menu == "পরীক্ষা দিন":
+# ----------------- ১. পরীক্ষা দিন (Primary View) -----------------
+if menu == "পরীক্ষা দিন":
     st.markdown("## 📝 মডেল টেস্ট / পরীক্ষা দিন")
     
     if not st.session_state.question_bank:
-        st.warning("প্রশ্ন ব্যাংকে কোনো প্রশ্ন নেই! আগে পিডিএফ আপলোড করে প্রশ্ন জেনারেট করুন।")
+        st.warning("প্রশ্ন ব্যাংকে কোনো প্রশ্ন নেই! আগে সাইডবার থেকে 'পিডিএফ আপলোড ও প্রশ্ন তৈরি' এ গিয়ে প্রশ্ন জেনারেট করুন।")
     else:
         all_topics = list(set([q.get("topic", "অন্যান্য") for q in st.session_state.question_bank]))
         
-        exam_mode = st.radio("পরীক্ষার ধরণ নির্বাচন করুন:", ["সাবজেক্ট ভিত্তিক", "নির্দিষ্ট টপিক ভিত্তিক"])
+        exam_mode = st.radio("পরীক্ষার ধরণ নির্বাচন করুন:", ["সাবজেক্ট ভিত্তিক", "নির্দিষ্ট টপিক ভিত্তিক (যেমন: শব্দার্থ)"])
         
         available_pool = st.session_state.question_bank
         
@@ -233,18 +185,17 @@ elif menu == "পরীক্ষা দিন":
                 st.rerun()
                 
         if "current_exam" in st.session_state and st.session_state["current_exam"]:
-            # Check if time is already up
             if time.time() >= st.session_state.get("exam_end_time", 0) and not st.session_state.get("exam_submitted", False):
                 st.session_state["exam_submitted"] = True
                 st.rerun()
 
             if not st.session_state.get("exam_submitted", False):
-                # Live Javascript Countdown Timer Component
                 remaining_seconds = int(st.session_state["exam_end_time"] - time.time())
                 
+                # Enhanced live timer display component
                 timer_html = f"""
-                <div style="background-color: #ffebee; border-left: 5px solid #f44336; padding: 10px; border-radius: 4px; font-size: 18px; font-weight: bold; color: #c62828; margin-bottom: 15px;">
-                    ⏳ সময় বাকি: <span id="timer_display">গণনা হচ্ছে...</span>
+                <div style="background-color: #e3f2fd; border-left: 5px solid #2196f3; padding: 12px; border-radius: 6px; font-size: 20px; font-weight: bold; color: #0d47a1; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                    ⏳ বাকি সময়: <span id="timer_display" style="color: #d32f2f;">গণনা হচ্ছে...</span>
                 </div>
                 <script>
                 var timeLeft = {remaining_seconds};
@@ -256,7 +207,7 @@ elif menu == "পরীক্ষা দিন":
                     }} else {{
                         var mins = Math.floor(timeLeft / 60);
                         var secs = timeLeft % 60;
-                        document.getElementById("timer_display").innerHTML = mins + " মিনিট " + secs + " সেকেন্ড";
+                        document.getElementById("timer_display").innerHTML = mins + " মিনিট " + (secs < 10 ? "0" : "") + secs + " সেকেন্ড";
                         timeLeft--;
                     }}
                 }}, 1000);
@@ -267,7 +218,7 @@ elif menu == "পরীক্ষা দিন":
                 
                 with st.form("exam_form"):
                     for idx, q in enumerate(st.session_state["current_exam"]):
-                        st.write(f"**প্রশ্ন {idx+1}:** {q['question']}")
+                        st.markdown(f"**প্রশ্ন {idx+1}:** {q['question']}")
                         
                         radio_options = ["--- উত্তর নির্বাচন করুন ---"] + q['options']
                         
@@ -314,7 +265,7 @@ elif menu == "পরীক্ষা দিন":
 
                 for idx, q in enumerate(st.session_state["current_exam"]):
                     user_ans = st.session_state["user_answers"].get(idx)
-                    st.write(f"**প্রশ্ন {idx+1}:** {q['question']}")
+                    st.markdown(f"**প্রশ্ন {idx+1}:** {q['question']}")
                     
                     if user_ans == "--- উত্তর নির্বাচন করুন ---" or user_ans is None:
                         st.warning(f"আপনি উত্তর দেননি! সঠিক উত্তর: **{q['answer']}**")
@@ -330,4 +281,78 @@ elif menu == "পরীক্ষা দিন":
                     st.session_state.pop("current_exam", None)
                     st.session_state.pop("exam_submitted", None)
                     st.session_state.pop("exam_end_time", None)
+                    st.rerun()
+
+# ----------------- ২. পিডিএফ আপলোড ও প্রশ্ন তৈরি -----------------
+elif menu == "পিডিএফ আপলোড ও প্রশ্ন তৈরি":
+    st.markdown("## 📄 বই বা স্ক্যান করা পিডিএফ আপলোড করুন")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        selected_subject = st.selectbox("সাবজেক্ট বেছে নিন", subjects)
+    with col2:
+        topic_name = st.text_input("টপিকের নাম লিখুন (যেমন: শব্দার্থ, Vocabulary)")
+        
+    uploaded_file = st.file_uploader("পিডিএফ (PDF) ফাইল আপলোড করুন", type=["pdf"])
+    
+    if uploaded_file and topic_name:
+        st.success(f"ফাইল লোড হয়েছে: {uploaded_file.name}")
+        
+        if st.button("🤖 Gemini AI দিয়ে সর্বোচ্চ ৫০টি পর্যন্ত নতুন প্রশ্ন তৈরি করুন"):
+            if not st.session_state.api_key:
+                st.error("⚠️ বামপাশের সাইডবারে আপনার Gemini API Key প্রদান করুন!")
+            else:
+                with st.spinner("Gemini 3.8 Flash বইয়ের পৃষ্ঠা স্ক্যান করে নতুন ও ইউনিক প্রশ্ন তৈরি করছে... একটু সময় লাগতে পারে..."):
+                    qs, err = generate_questions_from_pdf_images(uploaded_file, selected_subject, topic_name, st.session_state.api_key, st.session_state.question_bank)
+                    if err:
+                        st.error(f"প্রশ্ন জেনারেট করতে ত্রুটি ঘটেছে: {err}")
+                    else:
+                        existing_questions_set = {q["question"].strip() for q in st.session_state.question_bank}
+                        new_added = 0
+                        for q in qs:
+                            if q["question"].strip() not in existing_questions_set:
+                                st.session_state.question_bank.append(q)
+                                existing_questions_set.add(q["question"].strip())
+                                new_added += 1
+                        
+                        save_question_bank()
+                        st.success(f"🎉 সফলভাবে Gemini AI থেকে নতুন {new_added} টি প্রশ্ন ব্যাংক-এ জমা হয়েছে এবং সেভ করা হয়েছে!")
+
+# ----------------- ৩. প্রশ্ন ব্যাংক -----------------
+elif menu == "প্রশ্ন ব্যাংক":
+    st.markdown("## 📚 প্রশ্ন ব্যাংক (Question Bank)")
+    
+    available_topics = list(set([q.get("topic", "অন্যান্য") for q in st.session_state.question_bank]))
+    
+    col_f1, col_f2, col_f3 = st.columns([2, 2, 1])
+    with col_f1:
+        sub_filter = st.selectbox("সাবজেক্ট ফিল্টার", ["সব"] + subjects)
+    with col_f2:
+        topic_filter = st.selectbox("টপিক ফিল্টার", ["সব"] + available_topics)
+    with col_f3:
+        if st.button("🗑️ সব মুছুন", type="primary"):
+            st.session_state.question_bank = []
+            save_question_bank()
+            st.rerun()
+            
+    filtered_qs = [
+        (idx, q) for idx, q in enumerate(st.session_state.question_bank)
+        if (sub_filter == "সব" or q["subject"] == sub_filter) and (topic_filter == "সব" or q.get("topic") == topic_filter)
+    ]
+    
+    st.write(f"মোট প্রশ্ন আছে: **{len(filtered_qs)}** টি")
+    
+    for idx, q in filtered_qs:
+        with st.expander(f"প্রশ্ন {idx+1}: [{q['subject']} - {q.get('topic', 'জেনারেল')}] {q['question']}"):
+            c1, c2 = st.columns([4, 1])
+            with c1:
+                for opt in q['options']:
+                    st.write(f"- {opt}")
+                st.write(f"**সঠিক উত্তর:** {q['answer']}")
+                st.caption(f"💡 ব্যাখ্যা: {q.get('explanation', 'কোন ব্যাখ্যা নেই')}")
+            with c2:
+                if st.button("🗑️ মুছুন", key=f"del_{idx}"):
+                    st.session_state.question_bank.pop(idx)
+                    save_question_bank()
+                    st.success("প্রশ্নটি মুছে ফেলা হয়েছে!")
                     st.rerun()
