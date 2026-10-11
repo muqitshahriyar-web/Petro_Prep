@@ -50,7 +50,6 @@ def generate_questions_from_pdf_images(pdf_file, subject, topic, api_key, existi
         doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
         images = []
         
-        # ৫০টি প্রশ্ন বা বড় পরিমাণের জন্য পাতার স্ক্যান সীমা বাড়িয়ে ২০ করা হলো
         for page_num in range(min(len(doc), 20)):
             page = doc[page_num]
             pix = page.get_pixmap(dpi=150)
@@ -58,7 +57,6 @@ def generate_questions_from_pdf_images(pdf_file, subject, topic, api_key, existi
             image = Image.open(io.BytesIO(img_bytes))
             images.append(image)
             
-        # পূর্বে তৈরি হওয়া প্রশ্নগুলোর একটি তালিকা তৈরি করা যাতে এআই সেগুলোর পুনরাবৃত্তি না করে
         existing_q_texts = [q["question"] for q in existing_questions if q.get("topic") == topic]
         avoid_text = ""
         if existing_q_texts:
@@ -122,7 +120,6 @@ if menu == "পিডিএফ আপলোড ও প্রশ্ন তৈর�
                     if err:
                         st.error(f"প্রশ্ন জেনারেট করতে ত্রুটি ঘটেছে: {err}")
                     else:
-                        # ফিল্টার করে নিশ্চিত করা হচ্ছে যাতে কোনো ডুপ্লিকেট প্রশ্ন যুক্ত না হয়
                         existing_questions_set = {q["question"].strip() for q in st.session_state.question_bank}
                         new_added = 0
                         for q in qs:
@@ -138,7 +135,6 @@ if menu == "পিডিএফ আপলোড ও প্রশ্ন তৈর�
 elif menu == "প্রশ্ন ব্যাংক":
     st.markdown("## 📚 প্রশ্ন ব্যাংক (Question Bank)")
     
-    # সাবজেক্ট এবং টপিক ফিল্টারের অপশন
     available_topics = list(set([q.get("topic", "অন্যান্য") for q in st.session_state.question_bank]))
     
     col_f1, col_f2, col_f3 = st.columns([2, 2, 1])
@@ -199,7 +195,12 @@ elif menu == "পরীক্ষা দিন":
                 available_pool = [q for q in available_pool if q.get("topic") == selected_topic]
             
         max_q = max(1, len(available_pool))
-        num_q = st.number_input("কতটি প্রশ্ন নিয়ে পরীক্ষা দিতে চান?", min_value=1, max_value=max_q, value=min(15, max_q))
+        
+        col_e1, col_e2 = st.columns(2)
+        with col_e1:
+            num_q = st.number_input("কতটি প্রশ্ন নিয়ে পরীক্ষা দিতে চান?", min_value=1, max_value=max_q, value=min(15, max_q))
+        with col_e2:
+            exam_duration = st.number_input("পরীক্ষার সময় (মিনিট):", min_value=1, max_value=120, value=10)
         
         if st.button("পরীক্ষা শুরু করুন"):
             if len(available_pool) == 0:
@@ -208,32 +209,56 @@ elif menu == "পরীক্ষা দিন":
                 exam_questions = random.sample(available_pool, min(num_q, len(available_pool)))
                 st.session_state["current_exam"] = exam_questions
                 st.session_state["user_answers"] = {}
+                st.session_state["exam_duration"] = exam_duration
                 
         if "current_exam" in st.session_state and st.session_state["current_exam"]:
-            st.subheader("আপনার প্রশ্নপত্র:")
+            st.info(f"⏱️ নির্ধারিত সময়: **{st.session_state.get('exam_duration', 10)} মিনিট** | মোট প্রশ্ন: **{len(st.session_state['current_exam'])}** টি")
+            st.markdown("---")
+            
             with st.form("exam_form"):
                 for idx, q in enumerate(st.session_state["current_exam"]):
-                    st.write(f"**প্রশ্ন {idx+1}:** {q['question']} *(বিষয়: {q['subject']} | টপিক: {q.get('topic', 'জেনারেল')})*")
-                    st.session_state["user_answers"][idx] = st.radio(
+                    st.write(f"**প্রশ্ন {idx+1}:** {q['question']}")
+                    
+                    # রেডিও বাটনে আগে থেকে টিক থাকা রোধ করতে প্লেসহোল্ডার যোগ করা হয়েছে
+                    radio_options = ["--- উত্তর নির্বাচন করুন ---"] + q['options']
+                    
+                    user_selection = st.radio(
                         f"উত্তর বেছে নিন ({idx+1}):", 
-                        q['options'], 
+                        radio_options, 
                         key=f"q_{idx}"
                     )
+                    
+                    st.session_state["user_answers"][idx] = user_selection
                     st.markdown("---")
                 
                 submitted = st.form_submit_button("পরীক্ষা জমা দিন (Submit)")
                 
             if submitted:
                 score = 0
+                correct_count = 0
+                wrong_count = 0
+                unanswered_count = 0
+                
                 st.subheader("📊 পরীক্ষার ফলাফল:")
                 for idx, q in enumerate(st.session_state["current_exam"]):
                     user_ans = st.session_state["user_answers"].get(idx)
-                    if user_ans == q['answer']:
+                    
+                    if user_ans == "--- উত্তর নির্বাচন করুন ---":
+                        unanswered_count += 1
+                        st.warning(f"প্রশ্ন {idx+1}: উত্তর দেননি! সঠিক উত্তর ছিল: **{q['answer']}**")
+                    elif user_ans == q['answer']:
                         score += 1
+                        correct_count += 1
                         st.success(f"প্রশ্ন {idx+1}: সঠিক হয়েছে! ({user_ans})")
                     else:
+                        wrong_count += 1
                         st.error(f"প্রশ্ন {idx+1}: ভুল হয়েছে! আপনার উত্তর: {user_ans} | সঠিক উত্তর: {q['answer']}")
+                    
                     st.info(f"💡 ব্যাখ্যা: {q.get('explanation', 'কোন ব্যাখ্যা নেই')}")
+                    st.markdown("---")
                     
                 st.balloons()
-                st.metric("আপনার স্কোর", f"{score} / {len(st.session_state['current_exam'])}")
+                col_m1, col_m2, col_m3 = st.columns(3)
+                col_m1.metric("প্রাপ্ত স্কোর", f"{score} / {len(st.session_state['current_exam'])}")
+                col_m2.metric("সঠিক উত্তর", correct_count)
+                col_m3.metric("ভুল / উত্তরহীন", wrong_count + unanswered_count)
