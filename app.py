@@ -1,12 +1,13 @@
 import streamlit as st
-import fitz  # PyMuPDF for PDF text extraction
+import fitz  # PyMuPDF
 import json
 import random
 import google.generativeai as genai
+from PIL import Image
+import io
 
 st.set_page_config(page_title="Petrobangla Exam Prep", layout="wide")
 
-# Session state initialization
 if "question_bank" not in st.session_state:
     st.session_state.question_bank = []
 
@@ -14,21 +15,33 @@ subjects = ["বাংলা", "English", "Math", "General Knowledge"]
 
 st.title("🔥 পেট্রোবাংলা জব প্রিপারেশন ও এআই কোশ্চেন ব্যাংক")
 
-# Sidebar - Gemini API Key Setup
 st.sidebar.header("⚙️ এআই সেটআপ")
-api_key = st.sidebar.text_input("Gemini API Key দিন", type="password", help="Google AI Studio থেকে প্রাপ্ত আপনার API Key এখানে দিন")
+api_key = st.sidebar.text_input("Gemini API Key দিন", type="password")
 
 menu = st.sidebar.radio("মেনু সিলেক্ট করুন", ["পিডিএফ আপলোড ও প্রশ্ন তৈরি", "প্রশ্ন ব্যাংক", "পরীক্ষা দিন"])
 
-# Helper function to generate MCQs using Gemini
-def generate_questions_with_gemini(text, subject, topic, api_key):
+def generate_questions_from_pdf_images(pdf_file, subject, topic, api_key):
     try:
         genai.configure(api_key=api_key)
+        # Using the latest stable model
         model = genai.GenerativeModel('gemini-1.5-flash')
         
+        # Convert PDF pages to images
+        pdf_file.seek(0)
+        doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
+        images = []
+        
+        # Take up to first 5 pages to avoid token overload
+        for page_num in range(min(len(doc), 5)):
+            page = doc[page_num]
+            pix = page.get_pixmap(dpi=150)
+            img_bytes = pix.tobytes("jpeg")
+            image = Image.open(io.BytesIO(img_bytes))
+            images.append(image)
+            
         prompt = f"""
         You are an expert exam question generator for Petrobangla job preparation.
-        Based on the provided text below, generate 5 multiple-choice questions (MCQs) for the subject "{subject}" and topic "{topic}".
+        Analyze the provided book/PDF pages and generate 5 multiple-choice questions (MCQs) for the subject "{subject}" and topic "{topic}".
         
         Strictly respond with ONLY a valid JSON array of objects. Do not include markdown code block formatting like ```json ... ```. Just raw JSON text.
         
@@ -37,12 +50,11 @@ def generate_questions_with_gemini(text, subject, topic, api_key):
         - "options": list of 4 strings (options A, B, C, D)
         - "answer": string (must exactly match one of the items in options)
         - "explanation": string (short explanation for the correct answer)
-        
-        Text content:
-        {text[:4000]}
         """
         
-        response = model.generate_content(prompt)
+        content_payload = [prompt] + images
+        response = model.generate_content(content_payload)
+        
         cleaned_response = response.text.strip()
         if cleaned_response.startswith("```json"):
             cleaned_response = cleaned_response[7:]
@@ -52,7 +64,6 @@ def generate_questions_with_gemini(text, subject, topic, api_key):
         
         questions = json.loads(cleaned_response)
         
-        # Attach metadata
         for q in questions:
             q["subject"] = subject
             q["topic"] = topic
@@ -63,46 +74,32 @@ def generate_questions_with_gemini(text, subject, topic, api_key):
 
 # ----------------- ১. পিডিএফ আপলোড ও প্রশ্ন তৈরি -----------------
 if menu == "পিডিএফ আপলোড ও প্রশ্ন তৈরি":
-    st.header("📄 টপিক-ভিত্তিক পিডিএফ আপলোড করুন")
+    st.header("📄 বই বা স্ক্যান করা পিডিএফ আপলোড করুন")
     
     col1, col2 = st.columns(2)
     with col1:
         selected_subject = st.selectbox("সাবজেক্ট বেছে নিন", subjects)
     with col2:
-        topic_name = st.text_input("টপিকের নাম লিখুন (যেমন: ব্যাকরণ, Algebra, কারেন্ট অ্যাফেয়ার্স)")
+        topic_name = st.text_input("টপিকের নাম লিখুন (যেমন: Vocabulary, কারেন্ট অ্যাফেয়ার্স)")
         
-    uploaded_file = st.file_uploader("পিডিএফ (PDF) বা টেক্সট ফাইল আপলোড করুন", type=["pdf", "txt"])
+    uploaded_file = st.file_uploader("পিডিএফ (PDF) ফাইল আপলোড করুন", type=["pdf"])
     
     if uploaded_file and topic_name:
-        st.success(f"ফাইল সফলতা সহকারে লোড হয়েছে: {uploaded_file.name}")
+        st.success(f"ফাইল লোড হয়েছে: {uploaded_file.name}")
         
-        # Extract text from PDF
-        extracted_text = ""
-        if uploaded_file.type == "application/pdf":
-            doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
-            for page in doc:
-                extracted_text += page.get_text()
-        else:
-            extracted_text = uploaded_file.read().decode("utf-8")
-            
-        st.subheader("নির্যাসিত টেক্সটের নমুনা:")
-        st.text_area("PDF Text", extracted_text[:500] + "...", height=120)
-        
-        if st.button("🤖 Gemini AI দিয়ে প্রশ্ন তৈরি করুন"):
+        if st.button("🤖 Gemini AI দিয়ে ছবি/টেキスト থেকে প্রশ্ন তৈরি করুন"):
             if not api_key:
                 st.error("⚠️ বামপাশের সাইডবারে আপনার Gemini API Key প্রদান করুন!")
-            elif len(extracted_text.strip()) < 20:
-                st.error("⚠️ ফাইলে পর্যাপ্ত টেক্সট পাওয়া যায়নি!")
             else:
-                with st.spinner("Gemini AI টেক্সট এনালাইস করে প্রশ্ন তৈরি করছে..."):
-                    qs, err = generate_questions_with_gemini(extracted_text, selected_subject, topic_name, api_key)
+                with st.spinner("Gemini AI বইয়ের পৃষ্ঠা স্ক্যান করে প্রশ্ন তৈরি করছে... થોడా সময় লাগতে পারে..."):
+                    qs, err = generate_questions_from_pdf_images(uploaded_file, selected_subject, topic_name, api_key)
                     if err:
                         st.error(f"প্রশ্ন জেনারেট করতে ত্রুটি ঘটেছে: {err}")
                     else:
                         st.session_state.question_bank.extend(qs)
                         st.success(f"🎉 সফলভাবে Gemini AI থেকে {len(qs)} টি নতুন প্রশ্ন ব্যাংক-এ জমা হয়েছে!")
 
-# ----------------- ২. প্রশ্ন ব্যাংক ও মুছে ফেলার সুযোগ -----------------
+# ----------------- ২. প্রশ্ন ব্যাংক -----------------
 elif menu == "প্রশ্ন ব্যাংক":
     st.header("📚 প্রশ্ন ব্যাংক (Question Bank)")
     
