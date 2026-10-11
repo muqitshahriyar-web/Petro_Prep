@@ -16,22 +16,26 @@ subjects = ["বাংলা", "English", "Math", "General Knowledge"]
 st.title("🔥 পেট্রোবাংলা জব প্রিপারেশন ও এআই কোশ্চেন ব্যাংক")
 
 st.sidebar.header("⚙️ এআই সেটআপ")
-api_key = st.sidebar.text_input("Gemini API Key দিন", type="password")
+# session_state ব্যবহার করা হয়েছে যাতে একবার কি দিলে বারবার দিতে না হয়
+if "api_key" not in st.session_state:
+    st.session_state.api_key = ""
+
+api_key_input = st.sidebar.text_input("Gemini API Key দিন", type="password", value=st.session_state.api_key)
+if api_key_input:
+    st.session_state.api_key = api_key_input
 
 menu = st.sidebar.radio("মেনু সিলেক্ট করুন", ["পিডিএফ আপলোড ও প্রশ্ন তৈরি", "প্রশ্ন ব্যাংক", "পরীক্ষা দিন"])
 
 def generate_questions_from_pdf_images(pdf_file, subject, topic, api_key):
     try:
         genai.configure(api_key=api_key)
-        # Using the latest stable model
+        # সঠিক ও বর্তমান মডেল নাম ব্যবহার করা হয়েছে
         model = genai.GenerativeModel('gemini-1.5-flash')
         
-        # Convert PDF pages to images
         pdf_file.seek(0)
         doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
         images = []
         
-        # Take up to first 5 pages to avoid token overload
         for page_num in range(min(len(doc), 5)):
             page = doc[page_num]
             pix = page.get_pixmap(dpi=150)
@@ -88,11 +92,11 @@ if menu == "পিডিএফ আপলোড ও প্রশ্ন তৈর�
         st.success(f"ফাইল লোড হয়েছে: {uploaded_file.name}")
         
         if st.button("🤖 Gemini AI দিয়ে ছবি/টেキスト থেকে প্রশ্ন তৈরি করুন"):
-            if not api_key:
+            if not st.session_state.api_key:
                 st.error("⚠️ বামপাশের সাইডবারে আপনার Gemini API Key প্রদান করুন!")
             else:
-                with st.spinner("Gemini AI বইয়ের পৃষ্ঠা স্ক্যান করে প্রশ্ন তৈরি করছে... થોడా সময় লাগতে পারে..."):
-                    qs, err = generate_questions_from_pdf_images(uploaded_file, selected_subject, topic_name, api_key)
+                with st.spinner("Gemini AI বইয়ের পৃষ্ঠা স্ক্যান করে প্রশ্ন তৈরি করছে... একটু সময় লাগতে পারে..."):
+                    qs, err = generate_questions_from_pdf_images(uploaded_file, selected_subject, topic_name, st.session_state.api_key)
                     if err:
                         st.error(f"প্রশ্ন জেনারেট করতে ত্রুটি ঘটেছে: {err}")
                     else:
