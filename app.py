@@ -2,6 +2,7 @@ import streamlit as st
 import fitz  # PyMuPDF for PDF text extraction
 import json
 import random
+import google.generativeai as genai
 
 st.set_page_config(page_title="Petrobangla Exam Prep", layout="wide")
 
@@ -13,7 +14,52 @@ subjects = ["বাংলা", "English", "Math", "General Knowledge"]
 
 st.title("🔥 পেট্রোবাংলা জব প্রিপারেশন ও এআই কোশ্চেন ব্যাংক")
 
+# Sidebar - Gemini API Key Setup
+st.sidebar.header("⚙️ এআই সেটআপ")
+api_key = st.sidebar.text_input("Gemini API Key দিন", type="password", help="Google AI Studio থেকে প্রাপ্ত আপনার API Key এখানে দিন")
+
 menu = st.sidebar.radio("মেনু সিলেক্ট করুন", ["পিডিএফ আপলোড ও প্রশ্ন তৈরি", "প্রশ্ন ব্যাংক", "পরীক্ষা দিন"])
+
+# Helper function to generate MCQs using Gemini
+def generate_questions_with_gemini(text, subject, topic, api_key):
+    try:
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        prompt = f"""
+        You are an expert exam question generator for Petrobangla job preparation.
+        Based on the provided text below, generate 5 multiple-choice questions (MCQs) for the subject "{subject}" and topic "{topic}".
+        
+        Strictly respond with ONLY a valid JSON array of objects. Do not include markdown code block formatting like ```json ... ```. Just raw JSON text.
+        
+        Each JSON object must have these exact keys:
+        - "question": string (the MCQ question in Bengali or English based on text context)
+        - "options": list of 4 strings (options A, B, C, D)
+        - "answer": string (must exactly match one of the items in options)
+        - "explanation": string (short explanation for the correct answer)
+        
+        Text content:
+        {text[:4000]}
+        """
+        
+        response = model.generate_content(prompt)
+        cleaned_response = response.text.strip()
+        if cleaned_response.startswith("```json"):
+            cleaned_response = cleaned_response[7:]
+        if cleaned_response.endswith("```"):
+            cleaned_response = cleaned_response[:-3]
+        cleaned_response = cleaned_response.strip()
+        
+        questions = json.loads(cleaned_response)
+        
+        # Attach metadata
+        for q in questions:
+            q["subject"] = subject
+            q["topic"] = topic
+            
+        return questions, None
+    except Exception as e:
+        return None, str(e)
 
 # ----------------- ১. পিডিএফ আপলোড ও প্রশ্ন তৈরি -----------------
 if menu == "পিডিএফ আপলোড ও প্রশ্ন তৈরি":
@@ -40,52 +86,54 @@ if menu == "পিডিএফ আপলোড ও প্রশ্ন তৈর�
             extracted_text = uploaded_file.read().decode("utf-8")
             
         st.subheader("নির্যাসিত টেক্সটের নমুনা:")
-        st.text_area("PDF Text", extracted_text[:500] + "...", height=100)
+        st.text_area("PDF Text", extracted_text[:500] + "...", height=120)
         
-        if st.button("🤖 AI দিয়ে প্রশ্ন তৈরি করুন"):
-            st.info("AI টেক্সট এনালাইস করে প্রশ্ন তৈরি করছে...")
-            
-            # নমুনা জেনারেটেড প্রশ্ন (এখানে Gemini API কানেক্ট করে রিয়েল প্রশ্ন আসবে)
-            mock_generated_questions = [
-                {
-                    "subject": selected_subject,
-                    "topic": topic_name,
-                    "question": f"[{topic_name}] সম্পর্কিত আপলোডকৃত টেক্সট থেকে সংগৃহীত নমুনা প্রশ্ন ১?",
-                    "options": ["অপশন A", "অপশন B", "অপশন C", "অপশন D"],
-                    "answer": "অপশন A",
-                    "explanation": "এটি আপলোডকৃত টেক্সটের ৩ নং প্যারা থেকে সংগৃহীত সঠিক উত্তর।"
-                },
-                {
-                    "subject": selected_subject,
-                    "topic": topic_name,
-                    "question": f"[{topic_name}] সম্পর্কিত সংগৃহীত নমুনা প্রশ্ন ২?",
-                    "options": ["ক্লজ A", "ক্লজ B", "ক্লজ C", "ক্লজ D"],
-                    "answer": "ক্লজ B",
-                    "explanation": "পিডিএফ এর বিস্তারিত অংশে এটার সঠিক উত্তর উল্লেখ আছে।"
-                }
-            ]
-            
-            st.session_state.question_bank.extend(mock_generated_questions)
-            st.success(f"সফলভাবে {len(mock_generated_questions)} টি প্রশ্ন ব্যাকএন্ডে সংরক্ষিত হয়েছে!")
+        if st.button("🤖 Gemini AI দিয়ে প্রশ্ন তৈরি করুন"):
+            if not api_key:
+                st.error("⚠️ বামপাশের সাইডবারে আপনার Gemini API Key প্রদান করুন!")
+            elif len(extracted_text.strip()) < 20:
+                st.error("⚠️ ফাইলে পর্যাপ্ত টেক্সট পাওয়া যায়নি!")
+            else:
+                with st.spinner("Gemini AI টেক্সট এনালাইস করে প্রশ্ন তৈরি করছে..."):
+                    qs, err = generate_questions_with_gemini(extracted_text, selected_subject, topic_name, api_key)
+                    if err:
+                        st.error(f"প্রশ্ন জেনারেট করতে ত্রুটি ঘটেছে: {err}")
+                    else:
+                        st.session_state.question_bank.extend(qs)
+                        st.success(f"🎉 সফলভাবে Gemini AI থেকে {len(qs)} টি নতুন প্রশ্ন ব্যাংক-এ জমা হয়েছে!")
 
-# ----------------- ২. প্রশ্ন ব্যাংক -----------------
+# ----------------- ২. প্রশ্ন ব্যাংক ও মুছে ফেলার সুযোগ -----------------
 elif menu == "প্রশ্ন ব্যাংক":
     st.header("📚 প্রশ্ন ব্যাংক (Question Bank)")
     
-    sub_filter = st.selectbox("সাবজেক্ট ফিল্টার করুন", ["সব"] + subjects)
+    col_f1, col_f2 = st.columns([3, 1])
+    with col_f1:
+        sub_filter = st.selectbox("সাবজেক্ট ফিল্টার করুন", ["সব"] + subjects)
+    with col_f2:
+        if st.button("🗑️ সকল প্রশ্ন মুছে ফেলুন", type="primary"):
+            st.session_state.question_bank = []
+            st.rerun()
+            
+    filtered_qs = [
+        (idx, q) for idx, q in enumerate(st.session_state.question_bank)
+        if sub_filter == "সব" or q["subject"] == sub_filter
+    ]
     
-    filtered_qs = st.session_state.question_bank
-    if sub_filter != "সব":
-        filtered_qs = [q for q in filtered_qs if q["subject"] == sub_filter]
-        
     st.write(f"মোট প্রশ্ন আছে: **{len(filtered_qs)}** টি")
     
-    for idx, q in enumerate(filtered_qs):
+    for idx, q in filtered_qs:
         with st.expander(f"প্রশ্ন {idx+1}: [{q['subject']} - {q['topic']}] {q['question']}"):
-            for opt in q['options']:
-                st.write(f"- {opt}")
-            st.write(f"**সঠিক উত্তর:** {q['answer']}")
-            st.caption(f"ব্যাখ্যা: {q['explanation']}")
+            c1, c2 = st.columns([4, 1])
+            with c1:
+                for opt in q['options']:
+                    st.write(f"- {opt}")
+                st.write(f"**সঠিক উত্তর:** {q['answer']}")
+                st.caption(f"💡 ব্যাখ্যা: {q.get('explanation', 'কোন ব্যাখ্যা নেই')}")
+            with c2:
+                if st.button("🗑️ প্রশ্নটি মুছুন", key=f"del_{idx}"):
+                    st.session_state.question_bank.pop(idx)
+                    st.success("প্রশ্নটি মুছে ফেলা হয়েছে!")
+                    st.rerun()
 
 # ----------------- ৩. পরীক্ষা দিন -----------------
 elif menu == "পরীক্ষা দিন":
@@ -95,26 +143,32 @@ elif menu == "পরীক্ষা দিন":
         st.warning("প্রশ্ন ব্যাংকে কোনো প্রশ্ন নেই! আগে পিডিএফ আপলোড করে প্রশ্ন জেনারেট করুন।")
     else:
         exam_sub = st.selectbox("কোন সাবজেক্টের ওপর পরীক্ষা দিবেন?", ["সকল সাবজেক্ট (মডেল টেস্ট)"] + subjects)
-        num_q = st.number_input("কতটি প্রশ্ন নিয়ে পরীক্ষা দিতে চান?", min_value=1, max_value=max(1, len(st.session_state.question_bank)), value=min(5, len(st.session_state.question_bank)))
+        
+        available_pool = st.session_state.question_bank
+        if exam_sub != "সকল সাবজেক্ট (মডেল টেস্ট)":
+            available_pool = [q for q in available_pool if q["subject"] == exam_sub]
+            
+        max_q = max(1, len(available_pool))
+        num_q = st.number_input("কতটি প্রশ্ন নিয়ে পরীক্ষা দিতে চান?", min_value=1, max_value=max_q, value=min(5, max_q))
         
         if st.button("পরীক্ষা শুরু করুন"):
-            pool = st.session_state.question_bank
-            if exam_sub != "সকল সাবজেক্ট (মডেল টেস্ট)":
-                pool = [q for q in pool if q["subject"] == exam_sub]
-                
-            if len(pool) == 0:
+            if len(available_pool) == 0:
                 st.error("এই সাবজেক্টে এখনো কোনো প্রশ্ন যোগ করা হয়নি!")
             else:
-                exam_questions = random.sample(pool, min(num_q, len(pool)))
+                exam_questions = random.sample(available_pool, min(num_q, len(available_pool)))
                 st.session_state["current_exam"] = exam_questions
-                st.session_state["answers"] = {}
+                st.session_state["user_answers"] = {}
                 
-        if "current_exam" in st.session_state:
+        if "current_exam" in st.session_state and st.session_state["current_exam"]:
             st.subheader("আপনার প্রশ্নপত্র:")
             with st.form("exam_form"):
                 for idx, q in enumerate(st.session_state["current_exam"]):
                     st.write(f"**প্রশ্ন {idx+1}:** {q['question']} *(বিষয়: {q['subject']} | টপিক: {q['topic']})*")
-                    st.session_state["answers"][idx] = st.radio(f"উত্তর বেছে নিন ({idx+1}):", q['options'], key=f"q_{idx}")
+                    st.session_state["user_answers"][idx] = st.radio(
+                        f"উত্তর বেছে নিন ({idx+1}):", 
+                        q['options'], 
+                        key=f"q_{idx}"
+                    )
                     st.markdown("---")
                 
                 submitted = st.form_submit_button("পরীক্ষা জমা দিন (Submit)")
@@ -123,13 +177,13 @@ elif menu == "পরীক্ষা দিন":
                 score = 0
                 st.subheader("📊 পরীক্ষার ফলাফল:")
                 for idx, q in enumerate(st.session_state["current_exam"]):
-                    user_ans = st.session_state["answers"].get(idx)
+                    user_ans = st.session_state["user_answers"].get(idx)
                     if user_ans == q['answer']:
                         score += 1
                         st.success(f"প্রশ্ন {idx+1}: সঠিক হয়েছে! ({user_ans})")
                     else:
                         st.error(f"প্রশ্ন {idx+1}: ভুল হয়েছে! আপনার উত্তর: {user_ans} | সঠিক উত্তর: {q['answer']}")
-                    st.info(f"💡 ব্যাখ্যা: {q['explanation']}")
+                    st.info(f"💡 ব্যাখ্যা: {q.get('explanation', 'কোন ব্যাখ্যা নেই')}")
                     
                 st.balloons()
                 st.metric("আপনার স্কোর", f"{score} / {len(st.session_state['current_exam'])}")
