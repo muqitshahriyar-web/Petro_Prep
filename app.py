@@ -28,15 +28,14 @@ menu = st.sidebar.radio("মেনু সিলেক্ট করুন", ["প
 def generate_questions_from_pdf_images(pdf_file, subject, topic, api_key):
     try:
         genai.configure(api_key=api_key)
-        
-        # সরাসরি লেটেস্ট মডেল ব্যবহার করা হলো
-        model = genai.GenerativeModel('gemini-3.8-flash')
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
         pdf_file.seek(0)
         doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
         images = []
         
-        for page_num in range(min(len(doc), 5)):
+        # বড় পিডিএফ থেকে বেশি প্রশ্ন পেতে পেজ লিমিট বাড়িয়ে ১৫ পর্যন্ত করা হলো
+        for page_num in range(min(len(doc), 15)):
             page = doc[page_num]
             pix = page.get_pixmap(dpi=150)
             img_bytes = pix.tobytes("jpeg")
@@ -45,7 +44,7 @@ def generate_questions_from_pdf_images(pdf_file, subject, topic, api_key):
             
         prompt = f"""
         You are an expert exam question generator for Petrobangla job preparation.
-        Analyze the provided book/PDF pages and generate 5 multiple-choice questions (MCQs) for the subject "{subject}" and topic "{topic}".
+        Analyze the provided book/PDF pages thoroughly and generate 15 multiple-choice questions (MCQs) for the subject "{subject}" and topic "{topic}".
         
         Strictly respond with ONLY a valid JSON array of objects. Do not include markdown code block formatting like ```json ... ```. Just raw JSON text.
         
@@ -95,7 +94,7 @@ if menu == "পিডিএফ আপলোড ও প্রশ্ন তৈর�
             if not st.session_state.api_key:
                 st.error("⚠️ বামপাশের সাইডবারে আপনার Gemini API Key প্রদান করুন!")
             else:
-                with st.spinner("Gemini AI বইয়ের পৃষ্ঠা স্ক্যান করে প্রশ্ন তৈরি করছে... একটু সময় লাগতে পারে..."):
+                with st.spinner("Gemini AI বইয়ের পৃষ্ঠাগুলো স্ক্যান করে এক সাথে অনেকগুলো প্রশ্ন তৈরি করছে... একটু সময় লাগতে পারে..."):
                     qs, err = generate_questions_from_pdf_images(uploaded_file, selected_subject, topic_name, st.session_state.api_key)
                     if err:
                         st.error(f"প্রশ্ন জেনারেট করতে ত্রুটি ঘটেছে: {err}")
@@ -150,7 +149,7 @@ elif menu == "পরীক্ষা দিন":
             available_pool = [q for q in available_pool if q["subject"] == exam_sub]
             
         max_q = max(1, len(available_pool))
-        num_q = st.number_input("কতটি প্রশ্ন নিয়ে পরীক্ষা দিতে চান?", min_value=1, max_value=max_q, value=min(5, max_q))
+        num_q = st.number_input("কতটি প্রশ্ন নিয়ে পরীক্ষা দিতে চান?", min_value=1, max_value=max_q, value=min(10, max_q))
         
         if st.button("পরীক্ষা শুরু করুন"):
             if len(available_pool) == 0:
