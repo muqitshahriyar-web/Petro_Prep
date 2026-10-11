@@ -210,55 +210,76 @@ elif menu == "পরীক্ষা দিন":
                 st.session_state["current_exam"] = exam_questions
                 st.session_state["user_answers"] = {}
                 st.session_state["exam_duration"] = exam_duration
+                st.session_state["exam_submitted"] = False
                 
         if "current_exam" in st.session_state and st.session_state["current_exam"]:
-            st.info(f"⏱️ নির্ধারিত সময়: **{st.session_state.get('exam_duration', 10)} মিনিট** | মোট প্রশ্ন: **{len(st.session_state['current_exam'])}** টি")
-            st.markdown("---")
+            if not st.session_state.get("exam_submitted", False):
+                st.info(f"⏱️ নির্ধারিত সময়: **{st.session_state.get('exam_duration', 10)} মিনিট** | মোট প্রশ্ন: **{len(st.session_state['current_exam'])}** টি")
+                st.markdown("---")
+                
+                with st.form("exam_form"):
+                    for idx, q in enumerate(st.session_state["current_exam"]):
+                        st.write(f"**প্রশ্ন {idx+1}:** {q['question']}")
+                        
+                        radio_options = ["--- উত্তর নির্বাচন করুন ---"] + q['options']
+                        
+                        user_selection = st.radio(
+                            f"উত্তর বেছে নিন ({idx+1}):", 
+                            radio_options, 
+                            key=f"q_{idx}"
+                        )
+                        
+                        st.session_state["user_answers"][idx] = user_selection
+                        st.markdown("---")
+                    
+                    submitted = st.form_submit_button("পরীক্ষা জমা দিন (Submit)")
+                    
+                if submitted:
+                    st.session_state["exam_submitted"] = True
+                    st.rerun()
             
-            with st.form("exam_form"):
-                for idx, q in enumerate(st.session_state["current_exam"]):
-                    st.write(f"**প্রশ্ন {idx+1}:** {q['question']}")
-                    
-                    # রেডিও বাটনে আগে থেকে টিক থাকা রোধ করতে প্লেসহোল্ডার যোগ করা হয়েছে
-                    radio_options = ["--- উত্তর নির্বাচন করুন ---"] + q['options']
-                    
-                    user_selection = st.radio(
-                        f"উত্তর বেছে নিন ({idx+1}):", 
-                        radio_options, 
-                        key=f"q_{idx}"
-                    )
-                    
-                    st.session_state["user_answers"][idx] = user_selection
-                    st.markdown("---")
-                
-                submitted = st.form_submit_button("পরীক্ষা জমা দিন (Submit)")
-                
-            if submitted:
+            # সাবমিট হওয়ার পর ফলাফল এবং ব্যাখ্যা ওপরে স্কোর সহ দেখানো হবে
+            if st.session_state.get("exam_submitted", False):
                 score = 0
                 correct_count = 0
                 wrong_count = 0
                 unanswered_count = 0
                 
-                st.subheader("📊 পরীক্ষার ফলাফল:")
                 for idx, q in enumerate(st.session_state["current_exam"]):
                     user_ans = st.session_state["user_answers"].get(idx)
-                    
-                    if user_ans == "--- উত্তর নির্বাচন করুন ---":
-                        unanswered_count += 1
-                        st.warning(f"প্রশ্ন {idx+1}: উত্তর দেননি! সঠিক উত্তর ছিল: **{q['answer']}**")
-                    elif user_ans == q['answer']:
+                    if user_ans == q['answer']:
                         score += 1
                         correct_count += 1
-                        st.success(f"প্রশ্ন {idx+1}: সঠিক হয়েছে! ({user_ans})")
-                    else:
+                    elif user_ans != "--- উত্তর নির্বাচন করুন ---":
                         wrong_count += 1
-                        st.error(f"প্রশ্ন {idx+1}: ভুল হয়েছে! আপনার উত্তর: {user_ans} | সঠিক উত্তর: {q['answer']}")
-                    
-                    st.info(f"💡 ব্যাখ্যা: {q.get('explanation', 'কোন ব্যাখ্যা নেই')}")
-                    st.markdown("---")
-                    
-                st.balloons()
+                    else:
+                        unanswered_count += 1
+
+                st.markdown("## 📊 পরীক্ষার ফলাফল ও মূল্যায়ন")
                 col_m1, col_m2, col_m3 = st.columns(3)
                 col_m1.metric("প্রাপ্ত স্কোর", f"{score} / {len(st.session_state['current_exam'])}")
                 col_m2.metric("সঠিক উত্তর", correct_count)
                 col_m3.metric("ভুল / উত্তরহীন", wrong_count + unanswered_count)
+                
+                st.balloons()
+                st.markdown("---")
+                st.subheader("📝 প্রতিটি প্রশ্নের সঠিক উত্তর ও ব্যাখ্যা:")
+
+                for idx, q in enumerate(st.session_state["current_exam"]):
+                    user_ans = st.session_state["user_answers"].get(idx)
+                    st.write(f"**প্রশ্ন {idx+1}:** {q['question']}")
+                    
+                    if user_ans == "--- উত্তর নির্বাচন করুন ---":
+                        st.warning(f"আপনি উত্তর দেননি! সঠিক উত্তর: **{q['answer']}**")
+                    elif user_ans == q['answer']:
+                        st.success(f"আপনার উত্তর: {user_ans} (সঠিক)")
+                    else:
+                        st.error(f"আপনার উত্তর: {user_ans} | সঠিক উত্তর: **{q['answer']}**")
+                        
+                    st.info(f"💡 ব্যাখ্যা: {q.get('explanation', 'কোন ব্যাখ্যা নেই')}")
+                    st.markdown("---")
+                
+                if st.button("🔄 নতুন পরীক্ষা শুরু করুন"):
+                    st.session_state.pop("current_exam", None)
+                    st.session_state.pop("exam_submitted", None)
+                    st.rerun()
