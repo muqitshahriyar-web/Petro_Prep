@@ -3,14 +3,16 @@ import fitz  # PyMuPDF
 import json
 import os
 import random
+import time
 import google.generativeai as genai
 from PIL import Image
 import io
 
 st.set_page_config(page_title="Petrobangla Exam Prep", layout="wide")
 
-# Persistent storage file name
+# Persistent storage file names
 DB_FILE = "question_bank.json"
+CONFIG_FILE = "config.json"
 
 # Load question bank from local file if exists
 if "question_bank" not in st.session_state:
@@ -27,17 +29,33 @@ def save_question_bank():
     with open(DB_FILE, "w", encoding="utf-8") as f:
         json.dump(st.session_state.question_bank, f, ensure_ascii=False, indent=4)
 
+# Load saved API key from local config file if exists
+if "api_key" not in st.session_state:
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                config = json.load(f)
+                st.session_state.api_key = config.get("api_key", "")
+        except:
+            st.session_state.api_key = ""
+    else:
+        st.session_state.api_key = ""
+
+def save_api_key(key):
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump({"api_key": key}, f, ensure_ascii=False, indent=4)
+
 subjects = ["বাংলা", "English", "Math", "General Knowledge"]
 
 st.title("🔥 পেট্রোবাংলা জব প্রিপারেশন ও এআই কোশ্চেন ব্যাংক")
 
 st.sidebar.header("⚙️ এআই সেটআপ")
-if "api_key" not in st.session_state:
-    st.session_state.api_key = ""
 
 api_key_input = st.sidebar.text_input("Gemini API Key দিন", type="password", value=st.session_state.api_key)
-if api_key_input:
+if api_key_input and api_key_input != st.session_state.api_key:
     st.session_state.api_key = api_key_input
+    save_api_key(api_key_input)
+    st.sidebar.success("এপিআই কি সফলভাবে সেভ হয়েছে!")
 
 menu = st.sidebar.radio("মেনু সিলেক্ট করুন", ["পিডিএফ আপলোড ও প্রশ্ন তৈরি", "প্রশ্ন ব্যাংক", "পরীক্ষা দিন"])
 
@@ -210,11 +228,41 @@ elif menu == "পরীক্ষা দিন":
                 st.session_state["current_exam"] = exam_questions
                 st.session_state["user_answers"] = {}
                 st.session_state["exam_duration"] = exam_duration
+                st.session_state["exam_end_time"] = time.time() + (exam_duration * 60)
                 st.session_state["exam_submitted"] = False
+                st.rerun()
                 
         if "current_exam" in st.session_state and st.session_state["current_exam"]:
+            # Check if time is already up
+            if time.time() >= st.session_state.get("exam_end_time", 0) and not st.session_state.get("exam_submitted", False):
+                st.session_state["exam_submitted"] = True
+                st.rerun()
+
             if not st.session_state.get("exam_submitted", False):
-                st.info(f"⏱️ নির্ধারিত সময়: **{st.session_state.get('exam_duration', 10)} মিনিট** | মোট প্রশ্ন: **{len(st.session_state['current_exam'])}** টি")
+                # Live Javascript Countdown Timer Component
+                remaining_seconds = int(st.session_state["exam_end_time"] - time.time())
+                
+                timer_html = f"""
+                <div style="background-color: #ffebee; border-left: 5px solid #f44336; padding: 10px; border-radius: 4px; font-size: 18px; font-weight: bold; color: #c62828; margin-bottom: 15px;">
+                    ⏳ সময় বাকি: <span id="timer_display">গণনা হচ্ছে...</span>
+                </div>
+                <script>
+                var timeLeft = {remaining_seconds};
+                var timerInterval = setInterval(function() {{
+                    if (timeLeft <= 0) {{
+                        clearInterval(timerInterval);
+                        document.getElementById("timer_display").innerHTML = "সময় শেষ!";
+                        window.location.reload();
+                    }} else {{
+                        var mins = Math.floor(timeLeft / 60);
+                        var secs = timeLeft % 60;
+                        document.getElementById("timer_display").innerHTML = mins + " মিনিট " + secs + " সেকেন্ড";
+                        timeLeft--;
+                    }}
+                }}, 1000);
+                </script>
+                """
+                st.markdown(timer_html, unsafe_allow_html=True)
                 st.markdown("---")
                 
                 with st.form("exam_form"):
@@ -238,7 +286,6 @@ elif menu == "পরীক্ষা দিন":
                     st.session_state["exam_submitted"] = True
                     st.rerun()
             
-            # সাবমিট হওয়ার পর ফলাফল এবং ব্যাখ্যা ওপরে স্কোর সহ দেখানো হবে
             if st.session_state.get("exam_submitted", False):
                 score = 0
                 correct_count = 0
@@ -269,7 +316,7 @@ elif menu == "পরীক্ষা দিন":
                     user_ans = st.session_state["user_answers"].get(idx)
                     st.write(f"**প্রশ্ন {idx+1}:** {q['question']}")
                     
-                    if user_ans == "--- উত্তর নির্বাচন করুন ---":
+                    if user_ans == "--- উত্তর নির্বাচন করুন ---" or user_ans is None:
                         st.warning(f"আপনি উত্তর দেননি! সঠিক উত্তর: **{q['answer']}**")
                     elif user_ans == q['answer']:
                         st.success(f"আপনার উত্তর: {user_ans} (সঠিক)")
@@ -282,4 +329,5 @@ elif menu == "পরীক্ষা দিন":
                 if st.button("🔄 নতুন পরীক্ষা শুরু করুন"):
                     st.session_state.pop("current_exam", None)
                     st.session_state.pop("exam_submitted", None)
+                    st.session_state.pop("exam_end_time", None)
                     st.rerun()
