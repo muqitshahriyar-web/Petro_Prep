@@ -183,7 +183,7 @@ elif menu == "পরীক্ষা দিন":
     else:
         all_topics = list(set([q.get("topic", "অন্যান্য") for q in st.session_state.question_bank]))
         
-        exam_mode = st.radio("পরীক্ষার ধরণ নির্বাচন করুন:", ["সাবজেক্ট ভিত্তিক", "নির্দিষ্ট টপিক ভিত্তিক (যেমন: শব্দার্থ)"])
+        exam_mode = st.radio("পরীক্ষার ধরণ নির্বাচন করুন:", ["সাবজেক্ট ভিত্তিক", "নির্দিষ্ট টপিক ভিত্তিক"])
         
         available_pool = st.session_state.question_bank
         
