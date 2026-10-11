@@ -44,7 +44,9 @@ menu = st.sidebar.radio("মেনু সিলেক্ট করুন", ["প
 def generate_questions_from_pdf_images(pdf_file, subject, topic, api_key):
     try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        # লেটেস্ট gemini-3.8-flash মডেল ব্যবহার করা হয়েছে
+        model = genai.GenerativeModel('gemini-3.8-flash')
         
         pdf_file.seek(0)
         doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
@@ -109,7 +111,7 @@ if menu == "পিডিএফ আপলোড ও প্রশ্ন তৈর�
             if not st.session_state.api_key:
                 st.error("⚠️ বামপাশের সাইডবারে আপনার Gemini API Key প্রদান করুন!")
             else:
-                with st.spinner("Gemini AI বইয়ের পৃষ্ঠা স্ক্যান করে প্রশ্ন তৈরি করছে... একটু সময় লাগতে পারে..."):
+                with st.spinner("Gemini 3.8 Flash বইয়ের পৃষ্ঠা স্ক্যান করে প্রশ্ন তৈরি করছে... একটু সময় লাগতে পারে..."):
                     qs, err = generate_questions_from_pdf_images(uploaded_file, selected_subject, topic_name, st.session_state.api_key)
                     if err:
                         st.error(f"প্রশ্ন জেনারেট করতে ত্রুটি ঘটেছে: {err}")
