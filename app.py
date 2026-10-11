@@ -10,26 +10,50 @@ import io
 
 st.set_page_config(page_title="Petrobangla Exam Prep", layout="wide")
 
-# Custom CSS for modern styling and professional colors
+# Standard and Professional CSS Styling (Colorful & Clean UI)
 st.markdown("""
     <style>
-    .main {
-        background-color: #f8f9fa;
+    .stApp {
+        background-color: #f4f7f6;
+    }
+    .main-header {
+        background: linear-gradient(135deg, #1e3d59, #17b978);
+        padding: 20px;
+        border-radius: 10px;
+        color: white;
+        text-align: center;
+        margin-bottom: 25px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .card {
+        background-color: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        margin-bottom: 15px;
+        border-left: 5px solid #17b978;
+    }
+    .timer-box {
+        background-color: #e8f4f8;
+        border-left: 5px solid #2196f3;
+        padding: 12px;
+        border-radius: 6px;
+        font-size: 18px;
+        font-weight: bold;
+        color: #0d47a1;
+        margin-bottom: 20px;
     }
     .stButton>button {
-        background-color: #0d6efd;
+        background-color: #17b978;
         color: white;
         border-radius: 8px;
-        padding: 0.5rem 1rem;
+        padding: 0.5rem 1.2rem;
         font-weight: 600;
         border: none;
     }
     .stButton>button:hover {
-        background-color: #0b5ed7;
+        background-color: #128c5f;
         color: white;
-    }
-    .css-1d391kg {
-        background-color: #f1f3f5;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -71,11 +95,14 @@ def save_api_key(key):
 
 subjects = ["বাংলা", "English", "Math", "General Knowledge"]
 
-st.markdown("<h1 style='text-align: center; color: #1e3d59;'>🔥 পেট্রোবাংলা জব প্রিপারেশন ও এআই কোশ্চেন ব্যাংক</h1>", unsafe_allow_html=True)
-st.markdown("---")
+st.markdown("""
+    <div class="main-header">
+        <h1>🔥 পেট্রোবাংলা জব প্রিপারেশন ও এআই কোশ্চেন ব্যাংক</h1>
+        <p style="margin: 0; font-size: 16px;">স্মার্ট এআই ভিত্তিক মডেল টেস্ট ও প্রশ্ন প্রস্তুতি প্ল্যাটফর্ম</p>
+    </div>
+""", unsafe_allow_html=True)
 
 st.sidebar.header("⚙️ এআই সেটআপ")
-
 api_key_input = st.sidebar.text_input("Gemini API Key দিন", type="password", value=st.session_state.api_key)
 if api_key_input and api_key_input != st.session_state.api_key:
     st.session_state.api_key = api_key_input
@@ -115,7 +142,7 @@ def generate_questions_from_pdf_images(pdf_file, subject, topic, api_key, existi
         
         Each JSON object must have these exact keys:
         - "question": string (the MCQ question in Bengali or English based on text context)
-        - "options": list of 4 strings (options A, B, C, D)
+        - "options": list of 4 strings (options A,B,C,D)
         - "answer": string (must exactly match one of the items in options)
         - "explanation": string (short explanation for the correct answer)
         """
@@ -142,7 +169,7 @@ def generate_questions_from_pdf_images(pdf_file, subject, topic, api_key, existi
 
 # ----------------- ১. পরীক্ষা দিন (Primary View) -----------------
 if menu == "পরীক্ষা দিন":
-    st.markdown("## 📝 মডেল টেস্ট / পরীক্ষা দিন")
+    st.markdown("### 📝 মডেল টেস্ট / পরীক্ষা দিন")
     
     if not st.session_state.question_bank:
         st.warning("প্রশ্ন ব্যাংকে কোনো প্রশ্ন নেই! আগে সাইডবার থেকে 'পিডিএফ আপলোড ও প্রশ্ন তৈরি' এ গিয়ে প্রশ্ন জেনারেট করুন।")
@@ -185,40 +212,32 @@ if menu == "পরীক্ষা দিন":
                 st.rerun()
                 
         if "current_exam" in st.session_state and st.session_state["current_exam"]:
-            if time.time() >= st.session_state.get("exam_end_time", 0) and not st.session_state.get("exam_submitted", False):
+            # Check if time is up
+            remaining_seconds = int(st.session_state.get("exam_end_time", 0) - time.time())
+            
+            if remaining_seconds <= 0 and not st.session_state.get("exam_submitted", False):
                 st.session_state["exam_submitted"] = True
+                st.warning("⏰ সময় শেষ! আপনার পরীক্ষাটি স্বয়ংক্রিয়ভাবে জমা হয়ে গেছে।")
                 st.rerun()
 
             if not st.session_state.get("exam_submitted", False):
-                remaining_seconds = int(st.session_state["exam_end_time"] - time.time())
+                mins = remaining_seconds // 60
+                secs = remaining_seconds % 60
                 
-                # Enhanced live timer display component
-                timer_html = f"""
-                <div style="background-color: #e3f2fd; border-left: 5px solid #2196f3; padding: 12px; border-radius: 6px; font-size: 20px; font-weight: bold; color: #0d47a1; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-                    ⏳ বাকি সময়: <span id="timer_display" style="color: #d32f2f;">গণনা হচ্ছে...</span>
+                st.markdown(f"""
+                <div class="timer-box">
+                    ⏳ বাকি সময়: <span style="color: #d32f2f; font-size: 22px;">{mins} মিনিট {secs} সেকেন্ড</span>
                 </div>
-                <script>
-                var timeLeft = {remaining_seconds};
-                var timerInterval = setInterval(function() {{
-                    if (timeLeft <= 0) {{
-                        clearInterval(timerInterval);
-                        document.getElementById("timer_display").innerHTML = "সময় শেষ!";
-                        window.location.reload();
-                    }} else {{
-                        var mins = Math.floor(timeLeft / 60);
-                        var secs = timeLeft % 60;
-                        document.getElementById("timer_display").innerHTML = mins + " মিনিট " + (secs < 10 ? "0" : "") + secs + " সেকেন্ড";
-                        timeLeft--;
-                    }}
-                }}, 1000);
-                </script>
-                """
-                st.markdown(timer_html, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
                 st.markdown("---")
                 
                 with st.form("exam_form"):
                     for idx, q in enumerate(st.session_state["current_exam"]):
-                        st.markdown(f"**প্রশ্ন {idx+1}:** {q['question']}")
+                        st.markdown(f"""
+                        <div class="card">
+                            <b>প্রশ্ন {idx+1}:</b> {q['question']}
+                        </div>
+                        """, unsafe_allow_html=True)
                         
                         radio_options = ["--- উত্তর নির্বাচন করুন ---"] + q['options']
                         
@@ -229,7 +248,7 @@ if menu == "পরীক্ষা দিন":
                         )
                         
                         st.session_state["user_answers"][idx] = user_selection
-                        st.markdown("---")
+                        st.markdown("<br>", unsafe_allow_html=True)
                     
                     submitted = st.form_submit_button("পরীক্ষা জমা দিন (Submit)")
                     
@@ -285,7 +304,7 @@ if menu == "পরীক্ষা দিন":
 
 # ----------------- ২. পিডিএফ আপলোড ও প্রশ্ন তৈরি -----------------
 elif menu == "পিডিএফ আপলোড ও প্রশ্ন তৈরি":
-    st.markdown("## 📄 বই বা স্ক্যান করা পিডিএফ আপলোড করুন")
+    st.markdown("### 📄 বই বা স্ক্যান করা পিডিএফ আপলোড করুন")
     
     col1, col2 = st.columns(2)
     with col1:
@@ -320,7 +339,7 @@ elif menu == "পিডিএফ আপলোড ও প্রশ্ন তৈ�
 
 # ----------------- ৩. প্রশ্ন ব্যাংক -----------------
 elif menu == "প্রশ্ন ব্যাংক":
-    st.markdown("## 📚 প্রশ্ন ব্যাংক (Question Bank)")
+    st.markdown("### 📚 প্রশ্ন ব্যাংক (Question Bank)")
     
     available_topics = list(set([q.get("topic", "অন্যান্য") for q in st.session_state.question_bank]))
     
@@ -336,7 +355,7 @@ elif menu == "প্রশ্ন ব্যাংক":
             st.rerun()
             
     filtered_qs = [
-        (idx, q) for idx, q in enumerate(st.session_state.question_bank)
+        (idx, q) for idx, q in enumerate(st.session_state.question_blank)
         if (sub_filter == "সব" or q["subject"] == sub_filter) and (topic_filter == "সব" or q.get("topic") == topic_filter)
     ]
     
