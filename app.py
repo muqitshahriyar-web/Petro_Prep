@@ -97,7 +97,7 @@ subjects = ["বাংলা", "English", "Math", "General Knowledge"]
 
 st.markdown("""
     <div class="main-header">
-        <h1>🔥 পেট্রোবাংলা জব প্রিপারেশন ও এআই কোশ্চেন ব্যাংক</h1>
+        <h1>পেট্রোবাংলা জব প্রিপারেশন</h1>
         <p style="margin: 0; font-size: 16px;">স্মার্ট এআই ভিত্তিক মডেল টেস্ট ও প্রশ্ন প্রস্তুতি প্ল্যাটফর্ম</p>
     </div>
 """, unsafe_allow_html=True)
@@ -176,7 +176,7 @@ if menu == "পরীক্ষা দিন":
     else:
         all_topics = list(set([q.get("topic", "অন্যান্য") for q in st.session_state.question_bank]))
         
-        exam_mode = st.radio("পরীক্ষার ধরণ নির্বাচন করুন:", ["সাবজেক্ট ভিত্তিক", "নির্দিষ্ট টপিক ভিত্তিক (যেমন: শব্দার্থ)"])
+        exam_mode = st.radio("পরীক্ষার ধরণ নির্বাচন করুন:", ["সাবজেক্ট ভিত্তিক", "নির্দিষ্ট টপিক ভিত্তিক"])
         
         available_pool = st.session_state.question_bank
         
@@ -212,7 +212,6 @@ if menu == "পরীক্ষা দিন":
                 st.rerun()
                 
         if "current_exam" in st.session_state and st.session_state["current_exam"]:
-            # Check if time is up
             remaining_seconds = int(st.session_state.get("exam_end_time", 0) - time.time())
             
             if remaining_seconds <= 0 and not st.session_state.get("exam_submitted", False):
@@ -255,6 +254,10 @@ if menu == "পরীক্ষা দিন":
                 if submitted:
                     st.session_state["exam_submitted"] = True
                     st.rerun()
+                
+                # Live Countdown Ticker (updates every 1 second smoothly)
+                time.sleep(1)
+                st.rerun()
             
             if st.session_state.get("exam_submitted", False):
                 score = 0
@@ -355,7 +358,7 @@ elif menu == "প্রশ্ন ব্যাংক":
             st.rerun()
             
     filtered_qs = [
-        (idx, q) for idx, q in enumerate(st.session_state.question_blank)
+        (idx, q) for idx, q in enumerate(st.session_state.question_bank)
         if (sub_filter == "সব" or q["subject"] == sub_filter) and (topic_filter == "সব" or q.get("topic") == topic_filter)
     ]
     
