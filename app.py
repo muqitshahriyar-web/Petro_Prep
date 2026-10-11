@@ -29,17 +29,8 @@ def generate_questions_from_pdf_images(pdf_file, subject, topic, api_key):
     try:
         genai.configure(api_key=api_key)
         
-        # লেটেস্ট ও সচল মডেল নাম দিয়ে নিরাপদ ইনিশিয়ালাইজেশন
-        target_model = 'gemini-2.5-flash'
-        try:
-            for m in genai.list_models():
-                if 'generateContent' in m.supported_generation_methods and ('flash' in m.name or '2.5' in m.name or '2.0' in m.name):
-                    target_model = m.name
-                    break
-        except:
-            pass
-
-        model = genai.GenerativeModel(target_model)
+        # সরাসরি লেটেস্ট মডেল ব্যবহার করা হলো
+        model = genai.GenerativeModel('gemini-3.8-flash')
         
         pdf_file.seek(0)
         doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
