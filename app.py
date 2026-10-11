@@ -29,18 +29,17 @@ def generate_questions_from_pdf_images(pdf_file, subject, topic, api_key):
     try:
         genai.configure(api_key=api_key)
         
-        # Try finding the best available working model automatically or use standard fallback
-        model_name = 'gemini-1.5-flash'
+        # লেটেস্ট ও সচল মডেল নাম দিয়ে নিরাপদ ইনিশিয়ালাইজেশন
+        target_model = 'gemini-2.5-flash'
         try:
-            # Check available models if possible, or fallback safely
             for m in genai.list_models():
-                if 'generateContent' in m.supported_generation_methods and 'flash' in m.name:
-                    model_name = m.name
+                if 'generateContent' in m.supported_generation_methods and ('flash' in m.name or '2.5' in m.name or '2.0' in m.name):
+                    target_model = m.name
                     break
         except:
             pass
 
-        model = genai.GenerativeModel(model_name)
+        model = genai.GenerativeModel(target_model)
         
         pdf_file.seek(0)
         doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
