@@ -1,6 +1,7 @@
 import streamlit as st
 import fitz  # PyMuPDF
 import json
+import os
 import random
 import google.generativeai as genai
 from PIL import Image
@@ -8,8 +9,23 @@ import io
 
 st.set_page_config(page_title="Petrobangla Exam Prep", layout="wide")
 
+# Persistent storage file name
+DB_FILE = "question_bank.json"
+
+# Load question bank from local file if exists
 if "question_bank" not in st.session_state:
-    st.session_state.question_bank = []
+    if os.path.exists(DB_FILE):
+        try:
+            with open(DB_FILE, "r", encoding="utf-8") as f:
+                st.session_state.question_bank = json.load(f)
+        except:
+            st.session_state.question_bank = []
+    else:
+        st.session_state.question_bank = []
+
+def save_question_bank():
+    with open(DB_FILE, "w", encoding="utf-8") as f:
+        json.dump(st.session_state.question_bank, f, ensure_ascii=False, indent=4)
 
 subjects = ["বাংলা", "English", "Math", "General Knowledge"]
 
@@ -34,7 +50,6 @@ def generate_questions_from_pdf_images(pdf_file, subject, topic, api_key):
         doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
         images = []
         
-        # বড় পিডিএফ থেকে বেশি প্রশ্ন পেতে পেজ লিমিট বাড়িয়ে ১৫ পর্যন্ত করা হলো
         for page_num in range(min(len(doc), 15)):
             page = doc[page_num]
             pix = page.get_pixmap(dpi=150)
@@ -94,13 +109,14 @@ if menu == "পিডিএফ আপলোড ও প্রশ্ন তৈর�
             if not st.session_state.api_key:
                 st.error("⚠️ বামপাশের সাইডবারে আপনার Gemini API Key প্রদান করুন!")
             else:
-                with st.spinner("Gemini AI বইয়ের পৃষ্ঠাগুলো স্ক্যান করে এক সাথে অনেকগুলো প্রশ্ন তৈরি করছে... একটু সময় লাগতে পারে..."):
+                with st.spinner("Gemini AI বইয়ের পৃষ্ঠা স্ক্যান করে প্রশ্ন তৈরি করছে... একটু সময় লাগতে পারে..."):
                     qs, err = generate_questions_from_pdf_images(uploaded_file, selected_subject, topic_name, st.session_state.api_key)
                     if err:
                         st.error(f"প্রশ্ন জেনারেট করতে ত্রুটি ঘটেছে: {err}")
                     else:
                         st.session_state.question_bank.extend(qs)
-                        st.success(f"🎉 সফলভাবে Gemini AI থেকে {len(qs)} টি নতুন প্রশ্ন ব্যাংক-এ জমা হয়েছে!")
+                        save_question_bank()  # Save permanently to file
+                        st.success(f"🎉 সফলভাবে Gemini AI থেকে {len(qs)} টি নতুন প্রশ্ন ব্যাংক-এ জমা হয়েছে এবং সেভ করা হয়েছে!")
 
 # ----------------- ২. প্রশ্ন ব্যাংক -----------------
 elif menu == "প্রশ্ন ব্যাংক":
@@ -112,6 +128,7 @@ elif menu == "প্রশ্ন ব্যাংক":
     with col_f2:
         if st.button("🗑️ সকল প্রশ্ন মুছে ফেলুন", type="primary"):
             st.session_state.question_bank = []
+            save_question_bank()
             st.rerun()
             
     filtered_qs = [
@@ -132,6 +149,7 @@ elif menu == "প্রশ্ন ব্যাংক":
             with c2:
                 if st.button("🗑️ প্রশ্নটি মুছুন", key=f"del_{idx}"):
                     st.session_state.question_bank.pop(idx)
+                    save_question_bank()
                     st.success("প্রশ্নটি মুছে ফেলা হয়েছে!")
                     st.rerun()
 
