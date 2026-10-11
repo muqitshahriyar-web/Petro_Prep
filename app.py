@@ -16,7 +16,6 @@ subjects = ["বাংলা", "English", "Math", "General Knowledge"]
 st.title("🔥 পেট্রোবাংলা জব প্রিপারেশন ও এআই কোশ্চেন ব্যাংক")
 
 st.sidebar.header("⚙️ এআই সেটআপ")
-# session_state ব্যবহার করা হয়েছে যাতে একবার কি দিলে বারবার দিতে না হয়
 if "api_key" not in st.session_state:
     st.session_state.api_key = ""
 
@@ -29,8 +28,19 @@ menu = st.sidebar.radio("মেনু সিলেক্ট করুন", ["প
 def generate_questions_from_pdf_images(pdf_file, subject, topic, api_key):
     try:
         genai.configure(api_key=api_key)
-        # সঠিক ও বর্তমান মডেল নাম ব্যবহার করা হয়েছে
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        # Try finding the best available working model automatically or use standard fallback
+        model_name = 'gemini-1.5-flash'
+        try:
+            # Check available models if possible, or fallback safely
+            for m in genai.list_models():
+                if 'generateContent' in m.supported_generation_methods and 'flash' in m.name:
+                    model_name = m.name
+                    break
+        except:
+            pass
+
+        model = genai.GenerativeModel(model_name)
         
         pdf_file.seek(0)
         doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
