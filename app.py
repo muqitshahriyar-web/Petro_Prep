@@ -47,7 +47,7 @@ def save_api_key(key):
 
 subjects = ["বাংলা", "English", "Math", "General Knowledge"]
 
-st.title("🔥 পেট্রোবাংলা জব প্রিপারেশন ও এআই কোশ্চেন ব্যাংক")
+st.title("পেট্রোবাংলা জব প্রিপারেশন")
 
 st.sidebar.header("⚙️ এআই সেটআপ")
 
